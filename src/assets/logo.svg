@@ -1,0 +1,18 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="20" cy="20" r="18" fill="#1e3a8a" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Volleyball/Soccer ball pattern -->
+  <circle cx="20" cy="20" r="12" fill="#ffffff"/>
+  <path d="M8 20 L32 20 M20 8 L20 32" stroke="#1e3a8a" stroke-width="2" stroke-linecap="round"/>
+  <path d="M12 12 L28 28 M28 12 L12 28" stroke="#1e3a8a" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- Text -->
+  <text x="45" y="16" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1e3a8a">Sport</text>
+  <text x="45" y="30" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FF6B35">FTV</text>
+  
+  <!-- Small camera icon -->
+  <rect x="85" y="15" width="8" height="6" rx="1" fill="#6B7280"/>
+  <circle cx="89" cy="18" r="2" fill="#ffffff"/>
+  <rect x="93" y="16" width="2" height="4" fill="#6B7280"/>
+</svg>

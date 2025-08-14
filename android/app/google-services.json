@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "152644629650",
+    "project_id": "sport-ftv",
+    "storage_bucket": "sport-ftv.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:152644629650:android:3ef9bc7de7d7721648224b",
+        "android_client_info": {
+          "package_name": "com.sportftvapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZTMKsvFNLRrYNcGCvNA3cSV-TNSkBKHE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
