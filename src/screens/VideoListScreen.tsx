@@ -26,25 +26,32 @@ const VideoListScreen: React.FC<VideoListScreenProps> = () => {
     fetchVideos();
   }, [route.params]);
 
+  // NOVO CÓDIGO para a função fetchVideos
+
+  // Em src/screens/VideoListScreen.tsx
+
   const fetchVideos = async () => {
     try {
       setLoading(true);
       const videosCollection = collection(db, 'videos');
       
-      // Filtrar por arenaId e quadraId
-      let q = query(
+      // Log para depuração: mostra os filtros que estão sendo usados
+      console.log('Buscando vídeos com os filtros:', {
+        arenaId,
+        quadraId,
+        selectedDate,
+        selectedHour,
+      });
+      
+      // Consulta ao Firebase com TODOS os filtros necessários
+      const q = query(
         videosCollection,
         where('arenaId', '==', arenaId),
-        where('quadraId', '==', quadraId)
+        where('quadraId', '==', quadraId),
+        where('date', '==', selectedDate),
+        where('hour', '==', selectedHour), // <-- Filtro por HORA adicionado
+        orderBy('timestamp', 'desc')      // <-- Ordenação pelo timestamp correto
       );
-
-      // Se houver data selecionada, filtrar também por data
-      if (selectedDate) {
-        q = query(q, where('date', '==', selectedDate));
-      }
-
-      // Ordenar por timestamp (mais recentes primeiro)
-      q = query(q, orderBy('createdAt', 'desc'));
 
       const snapshot = await getDocs(q);
       const fetchedVideos: VideoMoment[] = [];
@@ -57,17 +64,23 @@ const VideoListScreen: React.FC<VideoListScreenProps> = () => {
           thumbnailUrl: data.thumbnailUrl || 'https://via.placeholder.com/300x200/e74c3c/ffffff?text=Video',
           videoUrl: data.videoUrl || '',
           duration: data.duration || '0:00',
-          timestamp: data.timestamp || data.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
+          timestamp: data.timestamp || (data.createdAt?.toDate()?.toISOString() || new Date().toISOString()),
           date: data.date || new Date().toISOString().split('T')[0],
           description: data.description || '',
           tournament: data.tournament || '',
-          views: typeof data.views === 'number' ? data.views : parseInt(data.views) || 0
+          views: typeof data.views === 'number' ? data.views : parseInt(data.views, 10) || 0,
+          arenaId: data.arenaId,
+          quadraId: data.quadraId,
+          hour: data.hour,
         });
       });
 
+      console.log(`Encontrados ${fetchedVideos.length} vídeos.`);
       setVideos(fetchedVideos);
+
     } catch (error) {
       console.error('Erro ao buscar vídeos:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao buscar os vídeos. Verifique sua conexão e a configuração do Firestore.');
       setVideos([]);
     } finally {
       setLoading(false);
@@ -84,18 +97,17 @@ const VideoListScreen: React.FC<VideoListScreenProps> = () => {
     });
   };
 
+// NOVO CÓDIGO para a função handleVideoPress
+
   const handleVideoPress = (video: VideoMoment) => {
-    Alert.alert(
-      'Reproduzir Vídeo',
-      `Deseja reproduzir "${video.title}"?\n\nDuração: ${video.duration}\nVisualizações: ${video.views}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Reproduzir', onPress: () => {
-          // Aqui seria implementada a navegação para o player de vídeo
-          Alert.alert('Player', 'Funcionalidade do player será implementada em breve!');
-        }}
-      ]
-    );
+    // Verificamos se há uma URL de vídeo válida
+    if (video.videoUrl) {
+      // Navegamos para a tela VideoPlayer e passamos os dados do vídeo
+      navigation.navigate('VideoPlayer', { video });
+    } else {
+      // Caso não haja URL, exibimos um alerta
+      Alert.alert('Erro', 'Este vídeo não está disponível para reprodução.');
+    }
   };
 
   const renderVideoItem = ({ item }: { item: VideoMoment }) => (
