@@ -1,38 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Image, Alert, ActivityIndicator } from 'react-native';
-import { ArrowLeft, Play, Calendar, Clock, MapPin, Video, Eye } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, ActivityIndicator } from 'react-native';
+import { ArrowLeft, Calendar, Clock, MapPin, Video } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { VideoMoment } from '../types/sportftv';
 import { db } from '../services/firebase';
+import VideoCard from '../components/VideoCard';
 
+// Tipagens
 type VideoListNavigationProp = StackNavigationProp<RootStackParamList, 'VideoList'>;
 type VideoListRouteProp = RouteProp<RootStackParamList, 'VideoList'>;
 
-interface VideoListScreenProps {}
-
-const VideoListScreen: React.FC<VideoListScreenProps> = () => {
+const VideoListScreen: React.FC = () => {
   const navigation = useNavigation<VideoListNavigationProp>();
   const route = useRoute<VideoListRouteProp>();
-  const { arenaId, arenaName, selectedDate, quadraId, quadraName, selectedHour, videoCount } = route.params;
+  const { arenaId, arenaName, selectedDate, quadraId, quadraName, selectedHour } = route.params;
   
   const [videos, setVideos] = useState<VideoMoment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'recent' | 'popular'>('all');
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchVideos();
   }, [route.params]);
-
-  // NOVO CÓDIGO para a função fetchVideos
 
   const fetchVideos = async () => {
     setLoading(true);
     try {
       console.log('Buscando vídeos com os filtros:', { arenaId, quadraId, selectedDate, selectedHour });
       
-      // Constrói a query com a SINTAXE CORRETA para @react-native-firebase
       const videosQuery = db.collection('videos')
         .where('arenaId', '==', arenaId)
         .where('quadraId', '==', quadraId)
@@ -42,7 +39,6 @@ const VideoListScreen: React.FC<VideoListScreenProps> = () => {
 
       const snapshot = await videosQuery.get();
       
-      // Mapeamento seguro dos dados para a interface VideoMoment
       const fetchedVideos: VideoMoment[] = snapshot.docs.map(doc => {
           const data = doc.data();
           return {
@@ -55,27 +51,28 @@ const VideoListScreen: React.FC<VideoListScreenProps> = () => {
             date: data.date || '',
             description: data.description || '',
             tournament: data.tournament || '',
-            views: data.views || 0,
             arenaId: data.arenaId,
             quadraId: data.quadraId,
             hour: data.hour,
           };
       });
 
-      console.log(`Encontrados ${fetchedVideos.length} vídeos.`);
       setVideos(fetchedVideos);
 
     } catch (error) {
       console.error('Erro ao buscar vídeos:', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao buscar os vídeos. Verifique sua conexão e a configuração do Firestore.');
-      setVideos([]);
+      Alert.alert('Erro', 'Ocorreu um erro ao buscar os vídeos.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handlePlayVideo = (videoId: string) => {
+    setPlayingVideoId(prevId => (prevId === videoId ? null : videoId));
+  };
+  
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = new Date(`${dateString}T00:00:00`);
     return date.toLocaleDateString('pt-BR', {
       weekday: 'long',
       year: 'numeric',
@@ -84,297 +81,153 @@ const VideoListScreen: React.FC<VideoListScreenProps> = () => {
     });
   };
 
-// NOVO CÓDIGO para a função handleVideoPress
-
-  const handleVideoPress = (video: VideoMoment) => {
-    // Verificamos se há uma URL de vídeo válida
-    if (video.videoUrl) {
-      // Navegamos para a tela VideoPlayer e passamos os dados do vídeo
-      navigation.navigate('VideoPlayer', { video });
-    } else {
-      // Caso não haja URL, exibimos um alerta
-      Alert.alert('Erro', 'Este vídeo não está disponível para reprodução.');
-    }
-  };
-
   const renderVideoItem = ({ item }: { item: VideoMoment }) => (
-    <TouchableOpacity 
-      style={styles.videoCard}
-      onPress={() => handleVideoPress(item)}
-    >
-      <View style={styles.thumbnailContainer}>
-        <Image 
-          source={{ uri: item.thumbnailUrl }} 
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
-        <View style={styles.playOverlay}>
-          <Play size={24} color="white" fill="white" />
-        </View>
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>{item.duration}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.videoInfo}>
-        <Text style={styles.videoTitle}>{item.title}</Text>
-        <View style={styles.videoMeta}>
-          <View style={styles.metaRow}>
-            <Clock size={14} color="#6B7280" />
-            <Text style={styles.metaText}>{item.timestamp}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Eye size={14} color="#6B7280" />
-            <Text style={styles.metaText}>{item.views} views</Text>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <VideoCard
+      video={item}
+      isPlaying={playingVideoId === item.id}
+      onPlay={handlePlayVideo}
+    />
   );
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft size={24} color="white" />
-          </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>Carregando Vídeos...</Text>
-            <Text style={styles.subtitle}>{quadraName} - {arenaName}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#e74c3c" />
-          <Text style={styles.loadingText}>Buscando vídeos das {selectedHour}:00...</Text>
-        </View>
-      </View>
-    );
-  }
-
+  
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft size={24} color="white" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Vídeos Encontrados</Text>
-          <Text style={styles.subtitle}>{quadraName} - {arenaName}</Text>
+           <ArrowLeft size={24} color="white" />
+         </TouchableOpacity>
+         <View style={styles.headerContent}>
+           <Text style={styles.title}>Vídeos Encontrados</Text>
+           <Text style={styles.subtitle}>{quadraName} - {arenaName}</Text>
         </View>
-      </View>
+       </View>
 
       <View style={styles.content}>
         <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
+           <View style={styles.infoRow}>
             <Calendar size={16} color="#1e3a8a" />
             <Text style={styles.infoText}>{formatDate(selectedDate)}</Text>
           </View>
           <View style={styles.infoRow}>
             <Clock size={16} color="#1e3a8a" />
             <Text style={styles.infoText}>Horário: {selectedHour}:00 - {selectedHour}:59</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <MapPin size={16} color="#1e3a8a" />
+           </View>
+           <View style={styles.infoRow}>
+             <MapPin size={16} color="#1e3a8a" />
             <Text style={styles.infoText}>{quadraName}</Text>
           </View>
         </View>
 
-        <View style={styles.resultsHeader}>
-          <Text style={styles.resultsTitle}>
-            {videos.length} vídeo{videos.length !== 1 ? 's' : ''} encontrado{videos.length !== 1 ? 's' : ''}
-          </Text>
-          <Text style={styles.resultsSubtitle}>
-            Toque em um vídeo para reproduzir
-          </Text>
-        </View>
-
-        {videos.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Video size={48} color="#9CA3AF" />
-            <Text style={styles.emptyTitle}>Nenhum vídeo encontrado</Text>
-            <Text style={styles.emptySubtitle}>
-              Não há vídeos disponíveis para esta quadra na data e horário selecionados.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={videos}
-            renderItem={renderVideoItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </View>
-    </View>
+         {loading ? (
+           <View style={styles.loadingContainer}>
+             <ActivityIndicator size="large" color="#1e3a8a" />
+             <Text style={styles.loadingText}>Buscando vídeos...</Text>
+           </View>
+         ) : (
+           videos.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Video size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>Nenhum vídeo encontrado</Text>
+              <Text style={styles.emptySubtitle}>Não há vídeos para esta seleção.</Text>
+             </View>
+           ) : (
+             <FlatList
+              data={videos}
+              renderItem={renderVideoItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+             />
+           )
+         )}
+       </View>
+     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    padding: 20,
-    backgroundColor: '#1e3a8a',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#E5E7EB',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 16,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  infoCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#111827',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  resultsHeader: {
-    marginBottom: 16,
-  },
-  resultsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  resultsSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  videoCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  thumbnailContainer: {
-    position: 'relative',
-    height: 120,
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  playOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 20,
-    padding: 8,
-  },
-  durationBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  durationText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  videoInfo: {
-    padding: 16,
-  },
-  videoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  videoMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#F9FAFB',
+    },
+    header: {
+        padding: 20,
+        backgroundColor: '#1e3a8a',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        marginRight: 16,
+    },
+    headerContent: {
+        flex: 1,
+    },
+    title: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: 'white',
+        marginBottom: 4,
+    },
+    subtitle: {
+        fontSize: 14,
+        color: '#E5E7EB',
+    },
+    content: {
+        flex: 1,
+        padding: 16,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#6B7280',
+    },
+    infoCard: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    infoText: {
+        fontSize: 14,
+        color: '#111827',
+        marginLeft: 8,
+        fontWeight: '500',
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#374151',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#6B7280',
+        textAlign: 'center',
+    },
+    listContainer: {
+        paddingBottom: 20,
+    }
 });
 
 export default VideoListScreen;

@@ -1,165 +1,120 @@
 import React from 'react';
-// Importamos os componentes do React Native em vez de tags HTML
-import { View, Text, Image, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native';
-import { Play, Clock, Calendar, Download } from 'lucide-react-native'; // Usamos a versão nativa do Lucide
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import Video from 'react-native-video'; // PASSO 1: Importar o componente de vídeo
+import { Play } from 'lucide-react-native';
 
-// A interface é exatamente a mesma!
+// PASSO 2: Atualizar a interface com as novas props
 interface VideoCardProps {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string;
-  videoUrl: string;
-  duration: string;
-  date: string;
-  onClick: () => void;
+  video: { // Recebemos o objeto de vídeo completo
+    id: string;
+    title: string;
+    thumbnailUrl?: string;
+    videoUrl: string;
+    duration: string;
+  };
+  isPlaying: boolean; // Diz se ESTE card é o que deve tocar
+  onPlay: (videoId: string) => void; // Função para avisar a tela principal
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({ title, thumbnail, videoUrl, duration, date, onClick }) => {
-
-  const handleDownload = (e: any) => {
-    // No mobile, o "download" geralmente significa abrir o link em um navegador,
-    // onde o usuário pode salvar. Bibliotecas mais avançadas podem salvar direto no dispositivo.
-    e.stopPropagation();
-    Alert.alert(
-      "Download do Vídeo",
-      `Deseja abrir o vídeo "${title}" no navegador?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Abrir", onPress: () => Linking.openURL(videoUrl) }
-      ]
-    );
-  };
-
-  const handlePlayVideo = () => {
-    Alert.alert(
-      "Reproduzir Vídeo",
-      `Reproduzindo: "${title}"`,
-      [
-        { text: "OK", onPress: onClick }
-      ]
-    );
-  };
+const VideoCard: React.FC<VideoCardProps> = ({ 
+  video,
+  isPlaying,
+  onPlay 
+}) => {
 
   return (
-    // TouchableOpacity é como um <div> clicável. É o nosso container principal.
-    <TouchableOpacity style={styles.card} onPress={handlePlayVideo}>
-      {/* View é o equivalente a <div> */}
+    <View style={styles.card}>
+      {/* O TouchableOpacity agora envolve apenas a área de play */}
       <View style={styles.thumbnailContainer}>
-        {/* Image precisa de uma URI no `source` */}
-        <Image source={{ uri: thumbnail }} style={styles.thumbnail} />
-        <View style={styles.overlay} />
-        <TouchableOpacity style={styles.playButtonContainer} onPress={handlePlayVideo}>
-          <View style={styles.playButton}>
-            <Play color="#1e40af" size={24} fill="#1e40af" />
-          </View>
-        </TouchableOpacity>
-        <View style={styles.durationContainer}>
-          <Clock size={12} color="white" />
-          <Text style={styles.durationText}>{duration}</Text>
-        </View>
-      </View>
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.metadataContainer}>
-          <View style={styles.metadataItem}>
-            <Calendar size={12} color="#6B7280" />
-            <Text style={styles.metadataText}>{date}</Text>
-          </View>
-          {/* Botão de Download */}
-          <TouchableOpacity onPress={handleDownload} style={styles.downloadButton}>
-            <Download size={16} color="#4B5563" />
+        {isPlaying ? (
+          // MODO PLAYER: Se isPlaying for true, renderiza o Player de Vídeo
+          <Video
+            source={{ uri: video.videoUrl }}
+            style={styles.videoPlayer}
+            resizeMode="cover"
+            controls={true} // Mostra os controles nativos (play, pause, volume, etc.)
+            paused={false}  // Inicia tocando automaticamente
+            // onEnd={() => onPlay(video.id)} // Opcional: para o vídeo ao terminar
+          />
+        ) : (
+          // MODO THUMBNAIL: Se não, renderiza a imagem com o botão de play
+          <TouchableOpacity style={styles.touchableThumb} onPress={() => onPlay(video.id)}>
+            <Image source={{ uri: video.thumbnailUrl || 'https://via.placeholder.com/300x200/1e3a8a/ffffff?text=Video' }} style={styles.thumbnail} />
+            <View style={styles.playOverlay}>
+              <Play size={24} color="white" fill="white" />
+            </View>
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationText}>{video.duration}</Text>
+            </View>
           </TouchableOpacity>
-        </View>
+        )}
       </View>
-    </TouchableOpacity>
+      
+      <View style={styles.infoContainer}>
+        <Text style={styles.title} numberOfLines={2}>{video.title}</Text>
+      </View>
+    </View>
   );
 };
 
-// A estilização é feita com JavaScript Objects, não CSS.
-// As propriedades são muito parecidas com CSS (ex: backgroundColor, fontSize).
+// PASSO 3: Adicionar e ajustar os estilos
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
     borderRadius: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 3,
     overflow: 'hidden',
   },
   thumbnailContainer: {
-    aspectRatio: 16 / 9,
     width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#000',
+  },
+  touchableThumb: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlayer: {
+    ...StyleSheet.absoluteFillObject, // Faz o vídeo ocupar todo o espaço
   },
   thumbnail: {
     width: '100%',
     height: '100%',
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  playOverlay: {
+    position: 'absolute',
+    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 40,
   },
-  playButtonContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  durationContainer: {
+  durationBadge: {
     position: 'absolute',
     bottom: 8,
     right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   durationText: {
     color: 'white',
     fontSize: 12,
-    marginLeft: 4,
+    fontWeight: '500',
   },
-  contentContainer: {
+  infoContainer: {
     padding: 16,
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 8,
-  },
-  metadataContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  metadataItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metadataText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-  downloadButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
 
