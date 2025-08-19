@@ -6,174 +6,76 @@ import {
   TouchableOpacity,
   StatusBar,
   Dimensions,
-  Alert,
   ActivityIndicator
 } from 'react-native';
-import Video from 'react-native-video';
-import { ChevronLeft, Play, Pause, Volume2, VolumeX, Maximize, Download } from 'lucide-react-native';
+import Video, { VideoRef } from 'react-native-video';
+import { ChevronLeft, Play, Pause } from 'lucide-react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 const { width, height } = Dimensions.get('window');
 
-interface VideoMoment {
-  id: string;
-  title: string;
-  description: string;
-  thumbnailUrl: string;
-  videoUrl: string;
-  duration: string;
-  date: string;
-  tournament: string;
-  views: string;
-}
+// Tipagens para navegação
+type VideoPlayerRouteProp = RouteProp<RootStackParamList, 'VideoPlayer'>;
+type VideoPlayerNavigationProp = StackNavigationProp<RootStackParamList, 'VideoPlayer'>;
 
-interface VideoPlayerScreenProps {
-  video: VideoMoment;
-  onBack: () => void;
-}
+const VideoPlayerScreen: React.FC = () => {
+  // Hooks para acessar os dados e a navegação
+  const navigation = useNavigation<VideoPlayerNavigationProp>();
+  const route = useRoute<VideoPlayerRouteProp>();
+  const { video } = route.params; // Pega os dados do vídeo a partir dos parâmetros da rota
 
-const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({
-  video,
-  onBack
-}) => {
   const [paused, setPaused] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const videoRef = useRef<any>(null);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const onProgress = (data: any) => {
-    setCurrentTime(data.currentTime);
-  };
-
-  const onLoad = (data: any) => {
-    setDuration(data.duration);
-    setLoading(false);
-  };
-
-  const onError = (error: any) => {
-    setLoading(false);
-    Alert.alert('Erro', 'Não foi possível carregar o vídeo. Verifique sua conexão.');
-    console.log('Video Error:', error);
-  };
-
-  const togglePlayPause = () => {
-    setPaused(!paused);
-  };
-
-  const toggleMute = () => {
-    setMuted(!muted);
-  };
-
-  const seekTo = (time: number) => {
-    if (videoRef.current) {
-      videoRef.current.seek(time);
-    }
-  };
+  
+  const videoRef = useRef<VideoRef>(null);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar hidden={true} />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <ChevronLeft size={24} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.videoTitle} numberOfLines={1}>
-            {video.title}
-          </Text>
-          <Text style={styles.videoMeta}>
-            {video.tournament} • {video.date}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.downloadButton}>
-          <Download size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Video Player */}
-      <View style={styles.videoContainer}>
+      {video.videoUrl ? (
         <Video
           ref={videoRef}
           source={{ uri: video.videoUrl }}
-          style={styles.video}
-          paused={paused}
-          muted={muted}
+          style={styles.videoPlayer}
           resizeMode="contain"
-          onProgress={onProgress}
-          onLoad={onLoad}
-          onError={onError}
-          progressUpdateInterval={1000}
+          paused={paused}
+          onLoad={() => setLoading(false)} // Esconde o loading quando o vídeo carrega
+          onError={(error) => console.error('Erro no player de vídeo:', error)}
+          onEnd={() => setPaused(true)} // Pausa o vídeo quando ele termina
         />
-
-        {/* Loading */}
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF6B35" />
-            <Text style={styles.loadingText}>Carregando vídeo...</Text>
-          </View>
-        )}
-
-        {/* Controls Overlay */}
-        <View style={styles.controlsOverlay}>
-          {/* Play/Pause Button */}
-          <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
-            {paused ? (
-              <Play size={40} color="#fff" fill="#fff" />
-            ) : (
-              <Pause size={40} color="#fff" fill="#fff" />
-            )}
-          </TouchableOpacity>
+      ) : (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>URL do vídeo não encontrada.</Text>
         </View>
+      )}
 
-        {/* Bottom Controls */}
-        <View style={styles.bottomControls}>
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { width: `${(currentTime / duration) * 100}%` }
-                ]} 
-              />
-            </View>
-            <Text style={styles.timeText}>{formatTime(duration)}</Text>
-          </View>
-
-          {/* Control Buttons */}
-          <View style={styles.controlButtons}>
-            <TouchableOpacity onPress={toggleMute}>
-              {muted ? (
-                <VolumeX size={24} color="#fff" />
-              ) : (
-                <Volume2 size={24} color="#fff" />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setFullscreen(!fullscreen)}>
-              <Maximize size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
+      {/* Overlay de Loading */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
         </View>
+      )}
+
+      {/* Controles do Player */}
+      <View style={styles.controlsOverlay}>
+        {/* Botão de Voltar */}
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ChevronLeft size={32} color="#fff" />
+        </TouchableOpacity>
+
+        {/* Botão de Play/Pause */}
+        <TouchableOpacity style={styles.playButton} onPress={() => setPaused(!paused)}>
+          {paused ? <Play size={32} color="#fff" /> : <Pause size={32} color="#fff" />}
+        </TouchableOpacity>
       </View>
 
-      {/* Video Info */}
-      <View style={styles.videoInfo}>
-        <Text style={styles.description}>{video.description}</Text>
-        <View style={styles.stats}>
-          <Text style={styles.statText}>👁 {video.views} visualizações</Text>
-          <Text style={styles.statText}>⏱ {video.duration}</Text>
-        </View>
+      {/* Informações do Vídeo */}
+      <View style={styles.infoOverlay}>
+        <Text style={styles.titleText}>{video.title}</Text>
+        <Text style={styles.descriptionText}>{video.description}</Text>
       </View>
     </View>
   );
@@ -183,58 +85,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 40,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  videoTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  videoMeta: {
-    color: '#ccc',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  downloadButton: {
-    padding: 8,
-  },
-  videoContainer: {
-    position: 'relative',
-    height: width * 9 / 16, // 16:9 aspect ratio
-    backgroundColor: '#000',
-  },
-  video: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
-  loadingText: {
-    color: '#fff',
-    marginTop: 12,
-    fontSize: 14,
+  videoPlayer: {
+    width: width,
+    height: height,
   },
   controlsOverlay: {
     position: 'absolute',
@@ -245,65 +100,53 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  playButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 40,
-    padding: 20,
-  },
-  bottomControls: {
+  backButton: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    top: 50,
+    left: 20,
+    padding: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 25,
   },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+  playButton: {
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 50,
   },
-  timeText: {
-    color: '#fff',
-    fontSize: 12,
-    minWidth: 40,
-  },
-  progressBar: {
-    flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    marginHorizontal: 12,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#FF6B35',
-    borderRadius: 2,
-  },
-  controlButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  videoInfo: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
+  infoOverlay: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 10,
     padding: 16,
   },
-  description: {
+  titleText: {
     color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  descriptionText: {
+    color: '#eee',
     fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
   },
-  stats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  statText: {
-    color: '#ccc',
-    fontSize: 12,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  errorText: {
+    color: 'white',
+    fontSize: 16,
+  }
 });
 
 export default VideoPlayerScreen;

@@ -5,7 +5,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { db } from '../services/firebase';
-import { collection, getDocs, query, where } from '@react-native-firebase/firestore';
+
 
 type HourSelectionNavigationProp = StackNavigationProp<RootStackParamList, 'HourSelection'>;
 type HourSelectionRouteProp = RouteProp<RootStackParamList, 'HourSelection'>;
@@ -28,66 +28,53 @@ const HourSelectionScreen: React.FC<HourSelectionScreenProps> = () => {
   const [loading, setLoading] = useState(true);
 
   // Buscar horários reais do Firebase
+  // Em src/screens/HourSelectionScreen.tsx
+
+// CÓDIGO CORRIGIDO PARA A FUNÇÃO fetchHourSlots
   const fetchHourSlots = async () => {
     try {
       setLoading(true);
       console.log(`Buscando horários para arena ${arenaId}, quadra ${quadraId} na data ${selectedDate}...`);
       
-      // Buscar vídeos para esta arena, quadra e data específica
-      const videosCollection = collection(db, 'videos');
-      const q = query(
-        videosCollection,
-        where('arenaId', '==', arenaId),
-        where('quadraId', '==', quadraId),
-        where('date', '==', selectedDate)
-      );
+      // Constrói a query usando a sintaxe do @react-native-firebase
+      const videosQuery = db.collection('videos')
+        .where('arenaId', '==', arenaId)
+        .where('quadraId', '==', quadraId)
+        .where('date', '==', selectedDate);
+        
+      const snapshot = await videosQuery.get();
       
-      const snapshot = await getDocs(q);
-      
-      // Contar vídeos por hora
+      // O resto da lógica para contar os vídeos permanece a mesma
       const hourVideoCounts: { [key: number]: number } = {};
       
       snapshot.forEach((doc) => {
         const data = doc.data();
         if (data.hour !== undefined && data.hour !== null) {
-          const hour = parseInt(data.hour.toString());
+          const hour = parseInt(data.hour.toString(), 10);
           if (!isNaN(hour) && hour >= 0 && hour <= 23) {
             hourVideoCounts[hour] = (hourVideoCounts[hour] || 0) + 1;
           }
         }
       });
       
-      // Gerar slots de horário de 6h às 23h
       const slots: HourSlot[] = [];
-      
       for (let hour = 6; hour <= 23; hour++) {
         const videoCount = hourVideoCounts[hour] || 0;
-        const hasVideos = videoCount > 0;
-        
         slots.push({
           hour,
           displayHour: `${hour.toString().padStart(2, '0')}:00`,
           videoCount,
-          hasVideos
+          hasVideos: videoCount > 0
         });
       }
       
-      console.log(`Encontrados horários:`, slots.filter(s => s.hasVideos));
+      console.log(`Encontrados horários:`, slots.filter(s => s.hasVideos).map(s => s.hour));
       setHourSlots(slots);
       
     } catch (error) {
       console.error('Erro ao buscar horários:', error);
-      // Fallback para horários padrão sem vídeos
-      const fallbackSlots: HourSlot[] = [];
-      for (let hour = 6; hour <= 23; hour++) {
-        fallbackSlots.push({
-          hour,
-          displayHour: `${hour.toString().padStart(2, '0')}:00`,
-          videoCount: 0,
-          hasVideos: false
-        });
-      }
-      setHourSlots(fallbackSlots);
+      // Adicionamos um Alert para melhor feedback ao usuário
+      Alert.alert("Erro de Conexão", "Não foi possível carregar os horários. Verifique sua conexão com a internet.");
     } finally {
       setLoading(false);
     }
@@ -124,13 +111,14 @@ const HourSelectionScreen: React.FC<HourSelectionScreenProps> = () => {
         { text: 'Voltar', style: 'cancel' },
         { 
           text: 'Ver Vídeos', 
-          onPress: () => navigation.navigate('FilteredVideos', {
+          onPress: () => navigation.navigate('VideoList', {
             arenaId,
             arenaName,
             selectedDate,
             quadraId,
             quadraName,
-            selectedHour: hour
+            selectedHour: hour,
+            videoCount: videoCount
           })
         }
       ]

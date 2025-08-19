@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Calendar, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -10,126 +10,191 @@ import { collection, getDocs, query, where } from '@react-native-firebase/firest
 type CalendarScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Calendar'>;
 type CalendarScreenRouteProp = RouteProp<RootStackParamList, 'Calendar'>;
 
+interface DateInfo {
+  date: Date;
+  dateString: string;
+  dayNumber: number;
+  dayName: string;
+  month: string;
+  isToday: boolean;
+  hasVideos: boolean;
+  videoCount: number;
+}
+
 interface CalendarScreenProps {}
 
-const CalendarScreen: React.FC<CalendarScreenProps> = () => {
+const CalendarScreenImproved: React.FC<CalendarScreenProps> = () => {
   const navigation = useNavigation<CalendarScreenNavigationProp>();
   const route = useRoute<CalendarScreenRouteProp>();
   const { arenaId, arenaName } = route.params;
   
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [datesWithVideos, setDatesWithVideos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  
-  // Buscar datas com vídeos disponíveis no Firebase
-  const fetchAvailableDates = async () => {
+  const [videoCountByDate, setVideoCountByDate] = useState<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    fetchVideoDates();
+  }, [arenaId, currentMonth]);
+
+  const fetchVideoDates = async () => {
     try {
       setLoading(true);
-      console.log('Buscando datas disponíveis para arena:', arenaId);
       
-      if (!arenaId) {
-        console.warn('ArenaId não fornecido');
-        return;
-      }
-
+      // Buscar todas as datas que têm vídeos para esta arena
       const videosCollection = collection(db, 'videos');
-      const videosQuery = query(
-        videosCollection,
-        where('arenaId', '==', arenaId)
-      );
       
-      const videosSnapshot = await getDocs(videosQuery);
-      const dates = new Set<string>();
+      // Buscar vídeos do mês atual e adjacentes para melhor UX
+      const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
       
-      videosSnapshot.forEach((doc) => {
+      // Expandir busca para incluir mês anterior e próximo
+      const startDate = new Date(startOfMonth);
+      startDate.setMonth(startDate.getMonth() - 1);
+      const endDate = new Date(endOfMonth);
+      endDate.setMonth(endDate.getMonth() + 1);
+      
+      const startDateString = startDate.toISOString().split('T')[0];
+      const endDateString = endDate.toISOString().split('T')[0];
+      
+      let videosQuery = query(videosCollection);
+      
+      // Aplicar filtro por arena se disponível
+      if (arenaId && arenaId !== 'all') {
+        try {
+          videosQuery = query(videosQuery, where('arenaId', '==', arenaId));
+        } catch (error) {
+          console.log('ArenaId field not found, fetching all videos');
+        }
+      }
+      
+      const snapshot = await getDocs(videosQuery);
+      const datesSet = new Set<string>();
+      const countMap = new Map<string, number>();
+      
+      snapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.date && data.arenaId === arenaId) {
-          dates.add(data.date);
+        let videoDate = '';
+        
+        // Tentar extrair data de diferentes campos
+        if (data.date) {
+          // Converter diferentes formatos de data para YYYY-MM-DD
+          if (data.date.includes('/')) {
+            // Formato DD/MM/YYYY ou MM/DD/YYYY
+            const parts = data.date.split('/');
+            if (parts.length === 3) {
+              // Assumir DD/MM/YYYY (formato brasileiro)
+              videoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+          } else if (data.date.includes('-')) {
+            // Já está em formato YYYY-MM-DD
+            videoDate = data.date;
+          }
+        } else if (data.timestamp) {
+          // Extrair data do timestamp
+          videoDate = data.timestamp.split('T')[0];
+        } else if (data.createdAt) {
+          // Usar createdAt como fallback
+          const createdDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+          videoDate = createdDate.toISOString().split('T')[0];
+        }
+        
+        if (videoDate && videoDate >= startDateString && videoDate <= endDateString) {
+          datesSet.add(videoDate);
+          countMap.set(videoDate, (countMap.get(videoDate) || 0) + 1);
         }
       });
       
-      console.log(`Encontradas ${dates.size} datas com vídeos:`, Array.from(dates));
-      setAvailableDates(dates);
+      setDatesWithVideos(datesSet);
+      setVideoCountByDate(countMap);
+      
     } catch (error) {
-      console.error('Erro ao buscar datas disponíveis:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as datas disponíveis');
+      console.error('Erro ao buscar datas com vídeos:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchAvailableDates();
-  }, [arenaId]);
-
-  // Gera os últimos 30 dias e próximos 30 dias
-  const generateDates = () => {
-    const dates = [];
+  const generateMonthDates = (): DateInfo[] => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
     const today = new Date();
     
-    // Últimos 30 dias
-    for (let i = 30; i >= 1; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      
-      const dateString = date.toISOString().split('T')[0];
-      const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' });
-      const dayNumber = date.getDate();
-      const month = date.toLocaleDateString('pt-BR', { month: 'short' });
-      
+    const dates: DateInfo[] = [];
+    
+    // Adicionar dias vazios do início do mês
+    const startDayOfWeek = firstDay.getDay();
+    for (let i = 0; i < startDayOfWeek; i++) {
+      const emptyDate = new Date(year, month, -startDayOfWeek + i + 1);
       dates.push({
-        dateString,
-        dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
-        dayNumber,
-        month,
+        date: emptyDate,
+        dateString: emptyDate.toISOString().split('T')[0],
+        dayNumber: emptyDate.getDate(),
+        dayName: '',
+        month: '',
         isToday: false,
-        hasVideos: availableDates.has(dateString)
+        hasVideos: false,
+        videoCount: 0
       });
     }
     
-    // Hoje e próximos 30 dias
-    for (let i = 0; i < 31; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      
+    // Adicionar todos os dias do mês
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      const date = new Date(year, month, day);
       const dateString = date.toISOString().split('T')[0];
-      const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' });
-      const dayNumber = date.getDate();
-      const month = date.toLocaleDateString('pt-BR', { month: 'short' });
+      const isToday = dateString === today.toISOString().split('T')[0];
+      const hasVideos = datesWithVideos.has(dateString);
+      const videoCount = videoCountByDate.get(dateString) || 0;
       
       dates.push({
+        date,
         dateString,
-        dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
-        dayNumber,
-        month,
-        isToday: i === 0,
-        hasVideos: availableDates.has(dateString)
+        dayNumber: day,
+        dayName: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
+        month: date.toLocaleDateString('pt-BR', { month: 'short' }),
+        isToday,
+        hasVideos,
+        videoCount
       });
     }
     
     return dates;
   };
 
-  const dates = generateDates();
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const newMonth = new Date(currentMonth);
+    if (direction === 'prev') {
+      newMonth.setMonth(newMonth.getMonth() - 1);
+    } else {
+      newMonth.setMonth(newMonth.getMonth() + 1);
+    }
+    setCurrentMonth(newMonth);
+  };
 
-  const handleDateSelect = (dateString: string, hasVideos: boolean) => {
-    if (!hasVideos) {
-      Alert.alert(
-        'Sem vídeos',
-        'Não há vídeos disponíveis para esta data.',
-        [{ text: 'OK' }]
-      );
+  const handleDateSelect = (dateInfo: DateInfo) => {
+    if (!dateInfo.hasVideos) {
+      // Mostrar mensagem se não há vídeos nesta data
       return;
     }
     
-    setSelectedDate(dateString);
+    setSelectedDate(dateInfo.dateString);
     // Navegar para seleção de quadras
     navigation.navigate('QuadraSelection', {
       arenaId,
       arenaName,
-      selectedDate: dateString
+      selectedDate: dateInfo.dateString
     });
   };
+
+  const goToToday = () => {
+    setCurrentMonth(new Date());
+  };
+
+  const dates = generateMonthDates();
+  const monthName = currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   return (
     <View style={styles.container}>
@@ -144,83 +209,104 @@ const CalendarScreen: React.FC<CalendarScreenProps> = () => {
       </View>
 
       <View style={styles.content}>
+        {/* Cabeçalho do Calendário */}
         <View style={styles.calendarHeader}>
           <Calendar size={20} color="#1e3a8a" />
           <Text style={styles.calendarTitle}>Escolha o dia dos vídeos</Text>
-          {loading && (
-            <ActivityIndicator size="small" color="#1e3a8a" style={{ marginLeft: 8 }} />
-          )}
         </View>
 
-        {loading ? (
+        {/* Navegação do Mês */}
+        <View style={styles.monthNavigation}>
+          <TouchableOpacity onPress={() => navigateMonth('prev')} style={styles.navButton}>
+            <ChevronLeft size={24} color="#1e3a8a" />
+          </TouchableOpacity>
+          
+          <View style={styles.monthInfo}>
+            <Text style={styles.monthName}>{monthName}</Text>
+            <TouchableOpacity onPress={goToToday} style={styles.todayButton}>
+              <Text style={styles.todayButtonText}>Hoje</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity onPress={() => navigateMonth('next')} style={styles.navButton}>
+            <ChevronRight size={24} color="#1e3a8a" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Dias da Semana */}
+        <View style={styles.weekDaysHeader}>
+          {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
+            <Text key={day} style={styles.weekDayText}>{day}</Text>
+          ))}
+        </View>
+
+        {/* Loading */}
+        {loading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#1e3a8a" />
-            <Text style={styles.loadingText}>Carregando datas disponíveis...</Text>
+            <Text style={styles.loadingText}>Carregando datas com vídeos...</Text>
           </View>
-        ) : (
-          <>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.datesContainer}
-            >
-              {dates.map((date) => (
+        )}
+
+        {/* Grid do Calendário */}
+        {!loading && (
+          <View style={styles.calendarGrid}>
+            {dates.map((dateInfo, index) => {
+              const isCurrentMonth = dateInfo.date.getMonth() === currentMonth.getMonth();
+              
+              return (
                 <TouchableOpacity
-                  key={date.dateString}
+                  key={index}
                   style={[
-                    styles.dateCard,
-                    selectedDate === date.dateString && styles.selectedDateCard,
-                    date.isToday && styles.todayCard,
-                    date.hasVideos && styles.dateWithVideos,
-                    !date.hasVideos && styles.dateWithoutVideos
+                    styles.dateCell,
+                    !isCurrentMonth && styles.dateCellOtherMonth,
+                    dateInfo.isToday && styles.todayCell,
+                    dateInfo.hasVideos && styles.dateWithVideos,
+                    selectedDate === dateInfo.dateString && styles.selectedDateCell
                   ]}
-                  onPress={() => handleDateSelect(date.dateString, date.hasVideos)}
-                  disabled={!date.hasVideos}
+                  onPress={() => isCurrentMonth && handleDateSelect(dateInfo)}
+                  disabled={!isCurrentMonth || !dateInfo.hasVideos}
                 >
                   <Text style={[
-                    styles.dayName,
-                    selectedDate === date.dateString && styles.selectedText,
-                    date.isToday && styles.todayText,
-                    !date.hasVideos && styles.disabledText
+                    styles.dateCellText,
+                    !isCurrentMonth && styles.dateCellTextOtherMonth,
+                    dateInfo.isToday && styles.todayText,
+                    dateInfo.hasVideos && styles.dateWithVideosText,
+                    selectedDate === dateInfo.dateString && styles.selectedDateText
                   ]}>
-                    {date.dayName}
+                    {dateInfo.dayNumber}
                   </Text>
-                  <Text style={[
-                    styles.dayNumber,
-                    selectedDate === date.dateString && styles.selectedText,
-                    date.isToday && styles.todayText,
-                    !date.hasVideos && styles.disabledText
-                  ]}>
-                    {date.dayNumber}
-                  </Text>
-                  <Text style={[
-                    styles.month,
-                    selectedDate === date.dateString && styles.selectedText,
-                    date.isToday && styles.todayText,
-                    !date.hasVideos && styles.disabledText
-                  ]}>
-                    {date.month}
-                  </Text>
-                  {date.isToday && (
-                    <View style={styles.todayDot} />
-                  )}
-                  {date.hasVideos && (
-                    <View style={styles.videoDot} />
+                  
+                  {dateInfo.hasVideos && (
+                    <View style={styles.videosIndicator}>
+                      <Text style={styles.videosCount}>{dateInfo.videoCount}</Text>
+                    </View>
                   )}
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.infoContainer}>
-              <Text style={styles.infoText}>
-                💡 Datas com ponto verde têm vídeos disponíveis
-              </Text>
-              <Text style={styles.infoSubText}>
-                Total de datas com vídeos: {availableDates.size}
-              </Text>
-            </View>
-          </>
+              );
+            })}
+          </View>
         )}
+
+        {/* Legenda */}
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.todayDot]} />
+            <Text style={styles.legendText}>Hoje</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.videosAvailableDot]} />
+            <Text style={styles.legendText}>Vídeos disponíveis</Text>
+          </View>
+        </View>
+
+        {/* Informações */}
+        <View style={styles.infoContainer}>
+          <Text style={styles.infoText}>
+            Toque em uma data destacada para ver os vídeos disponíveis.
+            {datesWithVideos.size === 0 && ' Nenhum vídeo encontrado para esta arena.'}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -268,92 +354,149 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginLeft: 8,
   },
-  datesContainer: {
+  monthNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
     paddingHorizontal: 8,
   },
-  dateCard: {
+  navButton: {
+    padding: 8,
+    borderRadius: 8,
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 6,
-    alignItems: 'center',
-    minWidth: 70,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  selectedDateCard: {
-    backgroundColor: '#1e3a8a',
+  monthInfo: {
+    alignItems: 'center',
   },
-  todayCard: {
-    borderWidth: 2,
-    borderColor: '#10B981',
-  },
-  dayName: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  dayNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  monthName: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#111827',
+    textTransform: 'capitalize',
     marginBottom: 4,
   },
-  month: {
-    fontSize: 12,
-    color: '#6B7280',
+  todayButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#10B981',
+    borderRadius: 12,
   },
-  selectedText: {
+  todayButtonText: {
     color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
-  todayText: {
-    color: '#10B981',
+  weekDaysHeader: {
+    flexDirection: 'row',
+    marginBottom: 8,
   },
-  todayDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  weekDayText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    paddingVertical: 8,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dateCell: {
+    width: '14.28%', // 7 dias por semana
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: 4,
+  },
+  dateCellOtherMonth: {
+    opacity: 0.3,
+  },
+  todayCell: {
     backgroundColor: '#10B981',
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  videoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
+    borderRadius: 8,
   },
   dateWithVideos: {
+    backgroundColor: '#EBF8FF',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: '#1e3a8a',
   },
-  dateWithoutVideos: {
-    opacity: 0.4,
-    backgroundColor: '#F3F4F6',
+  selectedDateCell: {
+    backgroundColor: '#1e3a8a',
+    borderRadius: 8,
   },
-  disabledText: {
+  dateCellText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  dateCellTextOtherMonth: {
     color: '#9CA3AF',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
+  todayText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
-  loadingText: {
-    fontSize: 16,
+  dateWithVideosText: {
+    color: '#1e3a8a',
+    fontWeight: '600',
+  },
+  selectedDateText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  videosIndicator: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videosCount: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 12,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  todayDot: {
+    backgroundColor: '#10B981',
+  },
+  videosAvailableDot: {
+    backgroundColor: '#1e3a8a',
+  },
+  legendText: {
+    fontSize: 12,
     color: '#6B7280',
-    marginTop: 16,
   },
   infoContainer: {
-    marginTop: 32,
     padding: 16,
     backgroundColor: '#EBF8FF',
     borderRadius: 8,
@@ -364,14 +507,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1e3a8a',
     textAlign: 'center',
-    marginBottom: 4,
+    lineHeight: 20,
   },
-  infoSubText: {
-    fontSize: 12,
-    color: '#1e3a8a',
-    textAlign: 'center',
-    opacity: 0.8,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
   },
 });
 
-export default CalendarScreen;
+export default CalendarScreenImproved;

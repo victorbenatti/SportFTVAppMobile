@@ -8,8 +8,12 @@ import CalendarScreen from '../screens/CalendarScreen';
 import QuadraSelectionScreen from '../screens/QuadraSelectionScreen';
 import HourSelectionScreen from '../screens/HourSelectionScreen';
 import VideoListScreen from '../screens/VideoListScreen';
-import FilteredVideosScreen from '../screens/FilteredVideosScreen';
 import VideoPlayerScreen from '../screens/VideoPlayerScreen';
+
+// Importando a interface VideoMoment para garantir a consistência dos tipos
+import { VideoMoment } from '../types/sportftv'; 
+
+// A tela FilteredVideosScreen foi removida das importações
 
 export type RootStackParamList = {
   Home: undefined;
@@ -38,33 +42,12 @@ export type RootStackParamList = {
     quadraId: string;
     quadraName: string;
     selectedHour: number;
-    videoCount: number;
-  };
-  FilteredVideos: {
-    arena: {
-      id: string;
-      name: string;
-    };
-    selectedDate: string;
-    quadra: {
-      id: string;
-      name: string;
-    };
-    selectedHour: number;
+    videoCount?: number; // Adicionado como opcional para flexibilidade
   };
   VideoPlayer: {
-    video: {
-      id: string;
-      title: string;
-      description: string;
-      thumbnailUrl: string;
-      videoUrl: string;
-      duration: string;
-      date: string;
-      tournament: string;
-      views: string;
-    };
+    video: VideoMoment; 
   };
+  // A rota FilteredVideos foi REMOVIDA daqui
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -75,6 +58,7 @@ const AppNavigator = () => {
       <Stack.Navigator
         initialRouteName="Home"
         screenOptions={{
+          headerShown: false,
           headerStyle: {
             backgroundColor: '#1e3a8a',
           },
@@ -82,55 +66,21 @@ const AppNavigator = () => {
           headerTitleStyle: {
             fontWeight: 'bold',
           },
+          // A linha 'headerBackTitleVisible: false' foi removida.
+          // O comportamento padrão já é suficiente na maioria dos casos.
         }}
       >
-        <Stack.Screen 
-          name="Home" 
-          component={HomeScreen} 
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="Login" 
-          component={LoginScreen} 
-          options={{ title: 'Login' }}
-        />
-        <Stack.Screen 
-          name="ArenaList" 
-          component={ArenaListScreen} 
-          options={{ title: 'Escolha uma Arena' }}
-        />
-        <Stack.Screen 
-          name="Calendar" 
-          component={CalendarScreen} 
-          options={({ route }) => ({ 
-            title: route.params.arenaName 
-          })}
-        />
-        <Stack.Screen 
-          name="QuadraSelection" 
-          component={QuadraSelectionScreen} 
-          options={{ title: 'Escolha a Quadra' }}
-        />
-        <Stack.Screen 
-          name="HourSelection" 
-          component={HourSelectionScreen} 
-          options={{ title: 'Escolha o Horário' }}
-        />
-        <Stack.Screen 
-          name="VideoList" 
-          component={VideoListScreen} 
-          options={{ title: 'Vídeos Encontrados' }}
-        />
-        <Stack.Screen 
-          name="FilteredVideos" 
-          component={FilteredVideosScreen} 
-          options={{ title: 'Melhores Momentos' }}
-        />
-        <Stack.Screen 
-          name="VideoPlayer" 
-          component={VideoPlayerScreen} 
-          options={{ title: 'Reproduzir Vídeo' }}
-        />
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: true, title: 'Login' }} />
+        <Stack.Screen name="ArenaList" component={ArenaListScreen} options={{ headerShown: true, title: 'Escolha uma Arena' }} />
+        <Stack.Screen name="Calendar" component={CalendarScreen} options={({ route }) => ({ headerShown: true, title: route.params.arenaName })} />
+        <Stack.Screen name="QuadraSelection" component={QuadraSelectionScreen} options={{ headerShown: true, title: 'Escolha a Quadra' }} />
+        <Stack.Screen name="HourSelection" component={HourSelectionScreen} options={{ headerShown: true, title: 'Escolha o Horário' }} />
+        <Stack.Screen name="VideoList" component={VideoListScreen} options={{ headerShown: true, title: 'Vídeos Encontrados' }} />
+        <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} options={{ headerShown: true, title: 'Reproduzir Vídeo' }} />
+        
+        {/* A linha <Stack.Screen name="FilteredVideos".../> foi REMOVIDA daqui */}
+
       </Stack.Navigator>
     </NavigationContainer>
   );

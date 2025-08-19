@@ -6,7 +6,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { VideoMoment } from '../types/sportftv';
 import { db } from '../services/firebase';
-import { collection, getDocs, query, where, orderBy } from '@react-native-firebase/firestore';
 
 type VideoListNavigationProp = StackNavigationProp<RootStackParamList, 'VideoList'>;
 type VideoListRouteProp = RouteProp<RootStackParamList, 'VideoList'>;
@@ -28,51 +27,39 @@ const VideoListScreen: React.FC<VideoListScreenProps> = () => {
 
   // NOVO CÓDIGO para a função fetchVideos
 
-  // Em src/screens/VideoListScreen.tsx
-
   const fetchVideos = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const videosCollection = collection(db, 'videos');
+      console.log('Buscando vídeos com os filtros:', { arenaId, quadraId, selectedDate, selectedHour });
       
-      // Log para depuração: mostra os filtros que estão sendo usados
-      console.log('Buscando vídeos com os filtros:', {
-        arenaId,
-        quadraId,
-        selectedDate,
-        selectedHour,
-      });
+      // Constrói a query com a SINTAXE CORRETA para @react-native-firebase
+      const videosQuery = db.collection('videos')
+        .where('arenaId', '==', arenaId)
+        .where('quadraId', '==', quadraId)
+        .where('date', '==', selectedDate)
+        .where('hour', '==', selectedHour)
+        .orderBy('timestamp', 'desc');
+
+      const snapshot = await videosQuery.get();
       
-      // Consulta ao Firebase com TODOS os filtros necessários
-      const q = query(
-        videosCollection,
-        where('arenaId', '==', arenaId),
-        where('quadraId', '==', quadraId),
-        where('date', '==', selectedDate),
-        where('hour', '==', selectedHour), // <-- Filtro por HORA adicionado
-        orderBy('timestamp', 'desc')      // <-- Ordenação pelo timestamp correto
-      );
-
-      const snapshot = await getDocs(q);
-      const fetchedVideos: VideoMoment[] = [];
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        fetchedVideos.push({
-          id: doc.id,
-          title: data.title || 'Vídeo sem título',
-          thumbnailUrl: data.thumbnailUrl || 'https://via.placeholder.com/300x200/e74c3c/ffffff?text=Video',
-          videoUrl: data.videoUrl || '',
-          duration: data.duration || '0:00',
-          timestamp: data.timestamp || (data.createdAt?.toDate()?.toISOString() || new Date().toISOString()),
-          date: data.date || new Date().toISOString().split('T')[0],
-          description: data.description || '',
-          tournament: data.tournament || '',
-          views: typeof data.views === 'number' ? data.views : parseInt(data.views, 10) || 0,
-          arenaId: data.arenaId,
-          quadraId: data.quadraId,
-          hour: data.hour,
-        });
+      // Mapeamento seguro dos dados para a interface VideoMoment
+      const fetchedVideos: VideoMoment[] = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title || 'Vídeo sem título',
+            thumbnailUrl: data.thumbnailUrl || 'https://via.placeholder.com/300x200/e74c3c/ffffff?text=Video',
+            videoUrl: data.videoUrl || '',
+            duration: data.duration || '0:00',
+            timestamp: data.timestamp || new Date().toISOString(),
+            date: data.date || '',
+            description: data.description || '',
+            tournament: data.tournament || '',
+            views: data.views || 0,
+            arenaId: data.arenaId,
+            quadraId: data.quadraId,
+            hour: data.hour,
+          };
       });
 
       console.log(`Encontrados ${fetchedVideos.length} vídeos.`);

@@ -6,7 +6,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useUser } from '../context/UserContext';
 import { db } from '../services/firebase';
-import { collection, getDocs, query, where } from '@react-native-firebase/firestore';
 
 type ArenaListNavigationProp = StackNavigationProp<RootStackParamList, 'ArenaList'>;
 
@@ -29,64 +28,57 @@ const ArenaListScreen: React.FC<ArenaListScreenProps> = () => {
   const [loading, setLoading] = useState(true);
 
   // Buscar arenas reais do Firebase
+  // Em src/screens/ArenaListScreen.tsx
+
   const fetchArenas = async () => {
     try {
       setLoading(true);
-      console.log('Buscando arenas do Firebase...');
-      
-      // Buscar vídeos para contar por arena
-      const videosCollection = collection(db, 'videos');
-      const videosSnapshot = await getDocs(videosCollection);
-      
-      // Contar vídeos por arena
-      const arenaVideoCounts: { [key: string]: number } = {};
-      const arenaNames: { [key: string]: string } = {};
-      
-      videosSnapshot.forEach((doc) => {
+      console.log('Buscando arenas da coleção "arenas"...');
+
+      // Busca diretamente na nova coleção 'arenas'
+      const arenasSnapshot = await db.collection('arenas').where('status', '==', 'active').get();
+
+      if (arenasSnapshot.empty) {
+        console.warn('Nenhuma arena encontrada na coleção "arenas".');
+        setArenas([]);
+        return;
+      }
+
+      // Mapeia os documentos para o formato que o app precisa
+      const arenasData: Arena[] = arenasSnapshot.docs.map(doc => {
         const data = doc.data();
-        if (data.arenaId) {
-          arenaVideoCounts[data.arenaId] = (arenaVideoCounts[data.arenaId] || 0) + 1;
-          // Tentar extrair nome da arena dos dados do vídeo se disponível
-          if (data.arenaName) {
-            arenaNames[data.arenaId] = data.arenaName;
-          }
+        return {
+          id: doc.id,
+          name: data.name || 'Arena sem nome',
+          address: data.address || 'Endereço não informado',
+          imageUrl: data.imageUrl || 'https://via.placeholder.com/300x200/1e3a8a/ffffff?text=Arena',
+          totalVideos: 0, // A contagem de vídeos será adicionada a seguir
+          totalQuadras: data.totalQuadras || 0,
+          status: data.status,
+        };
+      });
+      
+      // Bônus: Para manter a contagem de vídeos, fazemos uma segunda busca rápida
+      const videosSnapshot = await db.collection('videos').get();
+      const videoCounts = new Map<string, number>();
+      videosSnapshot.forEach(doc => {
+        const arenaId = doc.data().arenaId;
+        if (arenaId) {
+          videoCounts.set(arenaId, (videoCounts.get(arenaId) || 0) + 1);
         }
       });
-      
-      // Criar lista de arenas baseada nos vídeos encontrados
-      const arenasData: Arena[] = [];
-      
-      Object.keys(arenaVideoCounts).forEach((arenaId) => {
-        arenasData.push({
-          id: arenaId,
-          name: arenaNames[arenaId] || `Arena ${arenaId.replace('arena_', '').replace('_', ' ')}`,
-          address: 'Endereço não informado',
-          imageUrl: 'https://via.placeholder.com/300x200/1e3a8a/ffffff?text=Arena',
-          totalQuadras: 0, // Será calculado depois
-          totalVideos: arenaVideoCounts[arenaId],
-          status: 'active'
-        });
-      });
-      
-      // Se não houver arenas nos vídeos, criar uma arena padrão
-      if (arenasData.length === 0) {
-        arenasData.push({
-          id: 'arena_sport_center',
-          name: 'Arena Sport Center',
-          address: 'Adicione vídeos para esta arena',
-          imageUrl: 'https://via.placeholder.com/300x200/1e3a8a/ffffff?text=Arena+Sport+Center',
-          totalQuadras: 0,
-          totalVideos: 0,
-          status: 'active'
-        });
-      }
-      
-      console.log(`Encontradas ${arenasData.length} arenas:`, arenasData);
-      setArenas(arenasData);
-      
+
+      // Adiciona a contagem de vídeos em cada arena
+      const arenasWithVideoCounts = arenasData.map(arena => ({
+        ...arena,
+        totalVideos: videoCounts.get(arena.id) || 0,
+      }));
+
+      setArenas(arenasWithVideoCounts);
+
     } catch (error) {
       console.error('Erro ao buscar arenas:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as arenas');
+      Alert.alert('Erro', 'Não foi possível carregar as arenas.');
     } finally {
       setLoading(false);
     }
