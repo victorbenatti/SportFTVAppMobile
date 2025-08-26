@@ -25,6 +25,8 @@ const VideoListScreen: React.FC = () => {
     fetchVideos();
   }, [route.params]);
 
+  // Em src/screens/VideoListScreen.tsx
+
   const fetchVideos = async () => {
     setLoading(true);
     try {
@@ -43,7 +45,13 @@ const VideoListScreen: React.FC = () => {
           const data = doc.data();
           return {
             id: doc.id,
-            title: data.title || 'Vídeo sem título',
+            // A MÁGICA ACONTECE AQUI: O título agora é a hora exata do timestamp
+            title: new Date(data.timestamp).toLocaleTimeString('pt-BR', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              timeZone: 'UTC',
+            }),
             thumbnailUrl: data.thumbnailUrl || 'https://via.placeholder.com/300x200/e74c3c/ffffff?text=Video',
             videoUrl: data.videoUrl || '',
             duration: data.duration || '0:00',
