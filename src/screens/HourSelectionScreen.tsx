@@ -104,25 +104,16 @@ const HourSelectionScreen: React.FC<HourSelectionScreenProps> = () => {
     }
 
     setSelectedHour(hour);
-    Alert.alert(
-      'Horário Selecionado',
-      `Encontrados ${videoCount} vídeo${videoCount > 1 ? 's' : ''} das ${hour}:00 às ${hour}:59`,
-      [
-        { text: 'Voltar', style: 'cancel' },
-        { 
-          text: 'Ver Vídeos', 
-          onPress: () => navigation.navigate('VideoList', {
-            arenaId,
-            arenaName,
-            selectedDate,
-            quadraId,
-            quadraName,
-            selectedHour: hour,
-            videoCount: videoCount
-          })
-        }
-      ]
-    );
+    // Navegar diretamente para a tela de vídeos sem pop-up
+    navigation.navigate('VideoList', {
+      arenaId,
+      arenaName,
+      selectedDate,
+      quadraId,
+      quadraName,
+      selectedHour: hour,
+      videoCount: videoCount
+    });
   };
 
   const getHourPeriod = (hour: number) => {
