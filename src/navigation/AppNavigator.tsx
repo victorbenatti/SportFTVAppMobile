@@ -71,13 +71,13 @@ const AppNavigator = () => {
         }}
       >
         <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: true, title: 'Login' }} />
-        <Stack.Screen name="ArenaList" component={ArenaListScreen} options={{ headerShown: true, title: 'Escolha uma Arena' }} />
-        <Stack.Screen name="Calendar" component={CalendarScreen} options={({ route }) => ({ headerShown: true, title: route.params.arenaName })} />
-        <Stack.Screen name="QuadraSelection" component={QuadraSelectionScreen} options={{ headerShown: true, title: 'Escolha a Quadra' }} />
-        <Stack.Screen name="HourSelection" component={HourSelectionScreen} options={{ headerShown: true, title: 'Escolha o Horário' }} />
-        <Stack.Screen name="VideoList" component={VideoListScreen} options={{ headerShown: true, title: 'Vídeos Encontrados' }} />
-        <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} options={{ headerShown: true, title: 'Reproduzir Vídeo' }} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="ArenaList" component={ArenaListScreen} />
+        <Stack.Screen name="Calendar" component={CalendarScreen} />
+        <Stack.Screen name="QuadraSelection" component={QuadraSelectionScreen} />
+        <Stack.Screen name="HourSelection" component={HourSelectionScreen} />
+        <Stack.Screen name="VideoList" component={VideoListScreen} />
+        <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} />
         
         {/* A linha <Stack.Screen name="FilteredVideos".../> foi REMOVIDA daqui */}
 
