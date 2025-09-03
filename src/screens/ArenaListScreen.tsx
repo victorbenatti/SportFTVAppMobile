@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert } from 'react-native';
-import { MapPin, Users, ArrowLeft, Video } from 'lucide-react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { MapPin, Users, ArrowLeft, Video, Search } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -27,8 +27,9 @@ const ArenaListScreen: React.FC<ArenaListScreenProps> = () => {
   const [arenas, setArenas] = useState<Arena[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Buscar arenas reais do Firebase
-  // Em src/screens/ArenaListScreen.tsx
+  // Estados para busca
+  const [searchQuery, setSearchQuery] = useState(''); // Guarda o texto da busca
+  const [filteredArenas, setFilteredArenas] = useState<Arena[]>([]); // Guarda a lista filtrada
 
   const fetchArenas = async () => {
     try {
@@ -75,6 +76,7 @@ const ArenaListScreen: React.FC<ArenaListScreenProps> = () => {
       }));
 
       setArenas(arenasWithVideoCounts);
+      setFilteredArenas(arenasWithVideoCounts); // Inicializa a lista filtrada com todas as arenas
 
     } catch (error) {
       console.error('Erro ao buscar arenas:', error);
@@ -87,6 +89,18 @@ const ArenaListScreen: React.FC<ArenaListScreenProps> = () => {
   useEffect(() => {
     fetchArenas();
   }, []);
+
+  // Filtrar arenas baseado na busca
+  useEffect(() => {
+    if (searchQuery === '') {
+      setFilteredArenas(arenas); // Se a busca estiver vazia, mostra todas as arenas
+    } else {
+      const filtered = arenas.filter(arena =>
+        arena.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredArenas(filtered); // Se houver texto, filtra a lista
+    }
+  }, [searchQuery, arenas]);
 
   const handleSelectArena = (arena: Arena) => {
     if (arena.totalVideos === 0) {
@@ -171,14 +185,35 @@ const ArenaListScreen: React.FC<ArenaListScreenProps> = () => {
           <Text style={styles.loadingText}>Carregando arenas...</Text>
         </View>
       ) : (
-        <FlatList
-          data={arenas}
-          renderItem={renderArenaCard}
-          keyExtractor={item => item.id}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          {/* Barra de Pesquisa */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputWrapper}>
+              <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar por uma arena..."
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
+          <FlatList
+            data={filteredArenas}
+            renderItem={renderArenaCard}
+            keyExtractor={item => item.id}
+            ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Nenhuma arena encontrada.</Text>
+              </View>
+            )}
+          />
+        </>
       )}
     </View>
   );
@@ -307,6 +342,43 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#6B7280',
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
 
