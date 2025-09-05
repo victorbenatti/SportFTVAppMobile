@@ -9,6 +9,7 @@ import QuadraSelectionScreen from '../screens/QuadraSelectionScreen';
 import HourSelectionScreen from '../screens/HourSelectionScreen';
 import VideoListScreen from '../screens/VideoListScreen';
 import VideoPlayerScreen from '../screens/VideoPlayerScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 // Importando a interface VideoMoment para garantir a consistência dos tipos
 import { VideoMoment } from '../types/sportftv'; 
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   Home: undefined;
   Login: undefined;
   ArenaList: undefined;
+  Profile: undefined;
   Calendar: {
     arenaId: string;
     arenaName: string;
@@ -73,6 +75,7 @@ const AppNavigator = () => {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="ArenaList" component={ArenaListScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Calendar" component={CalendarScreen} />
         <Stack.Screen name="QuadraSelection" component={QuadraSelectionScreen} />
         <Stack.Screen name="HourSelection" component={HourSelectionScreen} />

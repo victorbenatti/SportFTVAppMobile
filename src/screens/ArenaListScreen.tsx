@@ -167,7 +167,7 @@ const ArenaListScreen: React.FC<ArenaListScreenProps> = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backButton}>
           <ArrowLeft size={24} color="white" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
